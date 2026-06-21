@@ -1,4 +1,5 @@
 import { Fuel } from "lucide-react"
+import { OperatorSearch } from "./OperatorSearch"
 
 const navItems = ["Operators", "Regions", "Access"]
 
@@ -38,7 +39,7 @@ export function AppShell() {
       </header>
 
       <main className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-8">
-        <p className="text-sm text-muted-foreground">EV Mobility Dashboard</p>
+        <OperatorSearch />
       </main>
     </div>
   )
