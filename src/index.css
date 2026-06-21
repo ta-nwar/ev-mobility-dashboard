@@ -59,6 +59,8 @@
   --dashboard-track-soft: oklch(0.93 0 0);
   --dashboard-map-a: oklch(0.96 0 0);
   --dashboard-map-b: oklch(0.93 0 0);
+  --dashboard-map-low: oklch(0.91 0 0);
+  --dashboard-map-high: oklch(0.22 0 0);
   --dashboard-chip-muted: oklch(0.72 0 0);
 }
 
@@ -92,6 +94,8 @@
   --dashboard-track-soft: oklch(1 0 0 / 12%);
   --dashboard-map-a: oklch(1 0 0 / 5%);
   --dashboard-map-b: oklch(1 0 0 / 9%);
+  --dashboard-map-low: oklch(1 0 0 / 12%);
+  --dashboard-map-high: oklch(0.86 0 0);
   --dashboard-chip-muted: oklch(0.57 0 0);
 }
 

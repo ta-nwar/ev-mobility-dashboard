@@ -1,5 +1,6 @@
 import json
 import hashlib
+import math
 import re
 import shutil
 import unicodedata
@@ -12,6 +13,7 @@ import duckdb
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "public" / "data" / "chargers.clean.parquet"
 TARGET_DIR = ROOT / "public" / "data" / "regions"
+STATE_BOUNDARIES = ROOT / "public" / "data" / "boundaries" / "germany-states.geojson"
 
 FAST_CHARGER_TYPE = "Schnellladeeinrichtung"
 TOP_OPERATOR_LIMIT = 5
@@ -67,6 +69,124 @@ def write_json(path: Path, data: object) -> None:
         json.dumps(data, ensure_ascii=False, separators=(",", ":"), default=str),
         encoding="utf-8",
     )
+
+
+def build_state_svg_paths() -> dict | None:
+    if not STATE_BOUNDARIES.exists():
+        return None
+
+    geojson = json.loads(STATE_BOUNDARIES.read_text(encoding="utf-8"))
+    pad = 8
+    target_width = 1000
+    min_step = 0.5
+
+    def mercator(coord: list[float]) -> tuple[float, float]:
+        lon, lat = coord
+        lat_rad = math.radians(lat)
+        return (
+            math.radians(lon),
+            math.log(math.tan(math.pi / 4 + lat_rad / 2)),
+        )
+
+    def rings(geometry: dict) -> list[list[list[float]]]:
+        polygons = (
+            [geometry["coordinates"]]
+            if geometry["type"] == "Polygon"
+            else geometry["coordinates"]
+        )
+        return [ring for polygon in polygons for ring in polygon]
+
+    projected = [
+        mercator(coord)
+        for feature in geojson["features"]
+        for ring in rings(feature["geometry"])
+        for coord in ring
+    ]
+    min_x = min(point[0] for point in projected)
+    max_x = max(point[0] for point in projected)
+    min_y = min(point[1] for point in projected)
+    max_y = max(point[1] for point in projected)
+    scale = (target_width - pad * 2) / (max_x - min_x)
+    height = round((max_y - min_y) * scale + pad * 2)
+
+    def project(coord: list[float]) -> tuple[float, float]:
+        x, y = mercator(coord)
+        return (
+            round(pad + (x - min_x) * scale, 1),
+            round(pad + (max_y - y) * scale, 1),
+        )
+
+    def distance(a: tuple[float, float], b: tuple[float, float]) -> float:
+        return math.hypot(a[0] - b[0], a[1] - b[1])
+
+    def ring_area(points: list[tuple[float, float]]) -> float:
+        return sum(
+            points[index][0] * points[index + 1][1]
+            - points[index + 1][0] * points[index][1]
+            for index in range(len(points) - 1)
+        ) / 2
+
+    def ring_centroid(points: list[tuple[float, float]]) -> tuple[float, float]:
+        area = ring_area(points)
+        if not area:
+            return (
+                sum(point[0] for point in points) / len(points),
+                sum(point[1] for point in points) / len(points),
+            )
+
+        cx = 0.0
+        cy = 0.0
+        for index in range(len(points) - 1):
+            x1, y1 = points[index]
+            x2, y2 = points[index + 1]
+            factor = x1 * y2 - x2 * y1
+            cx += (x1 + x2) * factor
+            cy += (y1 + y2) * factor
+
+        return (cx / (6 * area), cy / (6 * area))
+
+    def simplify_ring(ring: list[list[float]]) -> list[tuple[float, float]]:
+        kept: list[tuple[float, float]] = []
+        for point in [project(coord) for coord in ring]:
+            if not kept or distance(point, kept[-1]) >= min_step:
+                kept.append(point)
+        if kept and distance(kept[0], kept[-1]) > 0:
+            kept.append(kept[0])
+        return kept
+
+    states = []
+    for feature in geojson["features"]:
+        paths = []
+        largest_ring = None
+        largest_area = -1.0
+        for ring in rings(feature["geometry"]):
+            points = simplify_ring(ring)
+            if len(points) < 4:
+                continue
+            paths.append("M" + "L".join(f"{x},{y}" for x, y in points) + "Z")
+            area = abs(ring_area(points))
+            if area > largest_area:
+                largest_area = area
+                largest_ring = points
+
+        cx, cy = ring_centroid(largest_ring) if largest_ring else (0, 0)
+        states.append(
+            {
+                "slug": feature["properties"]["slug"],
+                "abbr": feature["properties"]["abbreviation"],
+                "name": feature["properties"]["name"],
+                "d": " ".join(paths),
+                "cx": round(cx, 1),
+                "cy": round(cy, 1),
+            }
+        )
+
+    states.sort(key=lambda item: item["slug"])
+    return {
+        "generatedFrom": "public/data/boundaries/germany-states.geojson",
+        "viewBox": {"w": target_width, "h": height},
+        "states": states,
+    }
 
 
 def read_rows(con: duckdb.DuckDBPyConnection, query: str) -> list[dict]:
@@ -396,6 +516,14 @@ def strip_for_child_list(record: dict) -> dict:
 
 
 def main() -> None:
+    state_svg_paths = build_state_svg_paths()
+    existing_state_svg_paths = None
+    existing_state_svg_path = TARGET_DIR / "germany-states-paths.json"
+    if state_svg_paths is None and existing_state_svg_path.exists():
+        existing_state_svg_paths = json.loads(
+            existing_state_svg_path.read_text(encoding="utf-8")
+        )
+
     if TARGET_DIR.exists():
         resolved_target = TARGET_DIR.resolve()
         resolved_public_data = (ROOT / "public" / "data").resolve()
@@ -617,6 +745,16 @@ def main() -> None:
                 "district": district,
                 "cities": cities_by_district[(state_slug, district_slug)],
             },
+        )
+
+    if state_svg_paths is not None:
+        write_json(TARGET_DIR / "germany-states-paths.json", state_svg_paths)
+    elif existing_state_svg_paths is not None:
+        write_json(TARGET_DIR / "germany-states-paths.json", existing_state_svg_paths)
+    else:
+        raise RuntimeError(
+            "Missing Germany state SVG paths. Add public/data/regions/germany-states-paths.json "
+            f"or source boundaries at {STATE_BOUNDARIES}."
         )
 
     print(

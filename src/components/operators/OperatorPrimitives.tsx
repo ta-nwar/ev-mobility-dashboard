@@ -18,7 +18,7 @@ export function FieldLabel({ children }: { children: ReactNode }) {
 
 export function DetailCell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-[18px] bg-background px-8 py-7">
+    <div className="flex min-w-0 flex-col gap-[18px] bg-background px-6 py-7 sm:px-8">
       {children}
     </div>
   )
