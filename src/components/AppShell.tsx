@@ -1,6 +1,6 @@
 import { Fuel } from "lucide-react"
 
-const navItems = ["Network Operators", "Regions", "Accessibility"]
+const navItems = ["Operators", "Regions", "Access"]
 
 export function AppShell() {
   return (
