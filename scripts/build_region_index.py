@@ -154,6 +154,9 @@ def build_state_svg_paths() -> dict | None:
             kept.append(kept[0])
         return kept
 
+    def format_coordinate(value: float) -> str:
+        return f"{value:g}"
+
     states = []
     for feature in geojson["features"]:
         paths = []
@@ -163,7 +166,13 @@ def build_state_svg_paths() -> dict | None:
             points = simplify_ring(ring)
             if len(points) < 4:
                 continue
-            paths.append("M" + "L".join(f"{x},{y}" for x, y in points) + "Z")
+            paths.append(
+                "M"
+                + "L".join(
+                    f"{format_coordinate(x)},{format_coordinate(y)}" for x, y in points
+                )
+                + "Z"
+            )
             area = abs(ring_area(points))
             if area > largest_area:
                 largest_area = area
@@ -195,10 +204,22 @@ def read_rows(con: duckdb.DuckDBPyConnection, query: str) -> list[dict]:
     return [dict(zip(columns, row)) for row in result]
 
 
+def geography_where(group_columns: list[str], *, extra: list[str] | None = None) -> str:
+    clauses = [
+        f"{column} is not null and trim({column}) <> ''"
+        for column in group_columns
+    ]
+    if extra:
+        clauses.extend(extra)
+
+    return f"where {' and '.join(clauses)}" if clauses else ""
+
+
 def metric_select(group_columns: list[str], max_commissioned: str) -> str:
     group_select = ",\n          ".join(group_columns)
     group_by = ", ".join(group_columns)
     select_prefix = f"{group_select},\n          " if group_select else ""
+    where_clause = geography_where(group_columns)
     group_clause = f"group by {group_by}" if group_by else ""
 
     return f"""
@@ -234,8 +255,8 @@ def metric_select(group_columns: list[str], max_commissioned: str) -> str:
             else 0
           end), 0)::integer as power_low_points,
           count(distinct nullif(trim(operator), ''))::integer as operator_count,
-          count(distinct district)::integer as district_count,
-          count(distinct city)::integer as city_count,
+          count(distinct nullif(trim(district), ''))::integer as district_count,
+          count(distinct nullif(trim(city), ''))::integer as city_count,
           coalesce(sum(case when opening_hours = '247' then 1 else 0 end), 0)::integer as open_247_units,
           coalesce(sum(case
             when parking_info ilike '%keine beschr%' then 1
@@ -285,6 +306,7 @@ def metric_select(group_columns: list[str], max_commissioned: str) -> str:
           min(commissioned_at) as first_live_date,
           max(commissioned_at) as newest_date
         from read_parquet('{SOURCE.as_posix()}')
+        {where_clause}
         {group_clause}
     """
 
@@ -387,6 +409,10 @@ def top_operator_groups(con: duckdb.DuckDBPyConnection, group_columns: list[str]
     group_select = ", ".join(group_columns)
     group_by = ", ".join([*group_columns, "operator"])
     order_by = ", ".join([*group_columns, "reported_nominal_kw desc", "charging_units desc", "operator asc"])
+    where_clause = geography_where(
+        group_columns,
+        extra=["operator is not null", "trim(operator) <> ''"],
+    )
     rows = read_rows(
         con,
         f"""
@@ -397,8 +423,7 @@ def top_operator_groups(con: duckdb.DuckDBPyConnection, group_columns: list[str]
           coalesce(sum(charging_points), 0)::integer as charging_points,
           coalesce(sum(nominal_power_kw), 0)::double as reported_nominal_kw
         from read_parquet('{SOURCE.as_posix()}')
-        where operator is not null
-          and trim(operator) <> ''
+        {where_clause}
         group by {group_by}
         order by {order_by}
         """,
@@ -445,6 +470,10 @@ def rollout_groups(con: duckdb.DuckDBPyConnection, group_columns: list[str]) -> 
     group_select = ", ".join(group_columns)
     group_by = ", ".join([*group_columns, "commissioned_year"])
     order_by = ", ".join([*group_columns, "commissioned_year asc"])
+    where_clause = geography_where(
+        group_columns,
+        extra=["commissioned_at is not null"],
+    )
     rows = read_rows(
         con,
         f"""
@@ -455,7 +484,7 @@ def rollout_groups(con: duckdb.DuckDBPyConnection, group_columns: list[str]) -> 
           coalesce(sum(charging_points), 0)::integer as charging_points,
           coalesce(sum(nominal_power_kw), 0)::double as reported_nominal_kw
         from read_parquet('{SOURCE.as_posix()}')
-        where commissioned_at is not null
+        {where_clause}
         group by {group_by}
         order by {order_by}
         """,
@@ -548,6 +577,8 @@ def main() -> None:
     state_rows = read_rows(con, metric_select(["state"], max_commissioned_text))
     district_rows = read_rows(con, metric_select(["state", "district"], max_commissioned_text))
     city_rows = read_rows(con, metric_select(["state", "district", "city"], max_commissioned_text))
+    if len(state_rows) != 16:
+        raise RuntimeError(f"Expected 16 non-empty states, found {len(state_rows)}")
     state_slugs = unique_slug_lookup(state_rows, parent_columns=[], name_column="state")
     district_slugs = unique_slug_lookup(
         district_rows,

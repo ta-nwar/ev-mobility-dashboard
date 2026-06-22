@@ -53,6 +53,12 @@ export type RegionRecord = {
   name: string
   slug: string
   rank?: number
+  parent?: {
+    state?: string
+    stateSlug?: string
+    district?: string
+    districtSlug?: string
+  }
   chargingUnits: number
   chargingPoints: number
   reportedNominalKw: number
@@ -87,14 +93,33 @@ export type RegionRecord = {
   rolloutByYear: RegionRolloutPoint[]
   topDistricts?: RegionBreakdownItem[]
   topCities?: RegionBreakdownItem[]
+  districtsFile?: string
+  citiesFile?: string
+  stateCount?: number
+  distinctCityNames?: number
 }
 
 export type RegionIndex = {
+  generatedFrom: string
   generatedThrough: string
+  sourceRows: number
+  grains: {
+    states: number
+    districts: number
+    cities: number
+    distinctCityNames: number
+  }
   national: RegionRecord
+  files: {
+    states: string
+    districtsByState: string
+    citiesByDistrict: string
+  }
+  metricNotes: Record<string, string>
 }
 
 export type RegionStatesIndex = {
+  generatedFrom: string
   generatedThrough: string
   states: RegionRecord[]
 }

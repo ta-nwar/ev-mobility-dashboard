@@ -1,7 +1,7 @@
 # Future Agent Guide
 
 This project is a Vite React dashboard for Germany EV charging infrastructure.
-The current production-quality surface is the Operators section.
+The current production-quality surfaces are Operators and Regions.
 
 ## Current Shape
 
@@ -12,6 +12,7 @@ The current production-quality surface is the Operators section.
 - App entry: `src/main.tsx` -> `src/App.tsx` -> `AppShell`.
 - Operators state: `src/components/OperatorSearch.tsx`.
 - Operators UI pieces: `src/components/operators/`.
+- Regions route: `src/components/regions/RegionsRoute.tsx`.
 
 ## Source Of Truth
 
@@ -58,7 +59,7 @@ Use semantic Tailwind classes and dashboard variables:
 - `--dashboard-row-hover`, `--dashboard-row-active`.
 - `--dashboard-track`, `--dashboard-track-mid`, `--dashboard-track-soft`.
 - `--dashboard-text-soft`, `--dashboard-text-subtle`.
-- `--dashboard-map-a`, `--dashboard-map-b`.
+- `--dashboard-map-low`, `--dashboard-map-high`.
 
 Do not add scattered raw component colors for light/dark variants. If a new
 visual role is needed, add a named CSS variable in both `:root` and `.dark`.
@@ -80,6 +81,7 @@ The app reads generated static data bundles:
 public/data/operators.json
 public/data/regions/index.json
 public/data/regions/states.json
+public/data/regions/germany-states-paths.json
 public/data/regions/districts/by-state/{stateSlug}.json
 public/data/regions/cities/by-district/{stateSlug}/{districtSlug}.json
 ```
@@ -110,9 +112,9 @@ Regional metric definitions live in:
 docs/region-metrics.md
 ```
 
-The regional bundle is split for lazy drill-down loading. Use `states.json` for
-state overview, a `districts/by-state/*.json` file after a state is selected,
-and a `cities/by-district/*/*.json` file after a district is selected.
+The current Regions UI loads `index.json`, `states.json`, and
+`germany-states-paths.json` eagerly. The district/city files are generated for
+future deeper drill-downs and should stay compatible with `BASE_URL`.
 
 Metric wording matters:
 
@@ -163,6 +165,8 @@ For UI changes, also browser-test at least:
 - Desktop overview or the changed desktop flow.
 - Operator detail if metrics or primitives changed.
 - Compare mode if rail selection, split bars, or table styles changed.
+- Regions overview/detail if routing, data paths, map paths, or dashboard
+  primitives changed.
 - Narrow mobile around 320px width for horizontal overflow.
 - Dark mode and light mode if colors, tokens, or layout primitives changed.
 

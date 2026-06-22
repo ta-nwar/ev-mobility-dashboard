@@ -107,3 +107,18 @@ These require extra source data or a separate methodology decision:
 - utilization, reliability, pricing, or delivered energy;
 - physical site count from clustering nearby charging units;
 - corporate operator-family normalization.
+
+## Map Boundaries
+
+The Regions UI also reads `public/data/regions/germany-states-paths.json`.
+That file contains simplified SVG path data for the 16 federal states and is
+served as runtime data so the map works under the GitHub Pages base path.
+
+`scripts/build_region_index.py` regenerates it from
+`public/data/boundaries/germany-states.geojson` when that source file exists.
+If the raw boundary source is absent, the generator preserves the committed
+runtime JSON. Boundary attribution shown in the UI is:
+
+```text
+GeoBasis-DE / BKG (2025), dl-de/by-2-0.
+```

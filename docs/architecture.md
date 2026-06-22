@@ -1,7 +1,7 @@
 # Architecture
 
-This is a Vite React single-page app. The current product surface is the
-Operators section of the EV Mobility Dashboard.
+This is a Vite React single-page app. The current product surfaces are the
+Operators and Regions sections of the EV Mobility Dashboard.
 
 ## Runtime Flow
 
@@ -9,10 +9,14 @@ Operators section of the EV Mobility Dashboard.
 2. `src/App.tsx` renders `AppShell`.
 3. `AppShell` owns the persistent frame: top navigation and full-height app
    canvas, including the light/dark mode toggle.
-4. `OperatorSearch` owns Operators state: search query, selected operator,
+4. `AppShell` switches between Operators and Regions based on `#regions` and
+   `?state=` URL state.
+5. `OperatorSearch` owns Operators state: search query, selected operator,
    compare mode, compare set, and KPI count-up progress.
-5. Operator views render from static JSON loaded from
+6. Operator views render from static JSON loaded from
    `public/data/operators.json`.
+7. `RegionsRoute` owns Regions state: ranking metric, hovered state, selected
+   state, regional JSON loading, and regional URL state.
 
 ## Component Boundaries
 
@@ -23,6 +27,7 @@ AppShell
     OperatorOverview
     OperatorDetail
     CompareView
+  RegionsRoute
 ```
 
 `OperatorSearch` should stay mostly orchestration. Visual sections should live
@@ -40,6 +45,8 @@ under `src/components/operators/`.
 - `src/components/operators/CompareView.tsx`: compare matrix.
 - `src/components/operators/OperatorPrimitives.tsx`: reusable visual building
   blocks such as split bars, chips, metrics, section labels, and sparklines.
+- `src/components/regions/RegionsRoute.tsx`: Regions overview, Germany map,
+  ranked state list, and state detail view.
 - `src/lib/useTheme.ts`: theme state, persistence, and document class updates.
 
 ## Data Boundaries
@@ -50,11 +57,13 @@ Types, formatting, and derived profile logic are outside the component tree:
 - `src/lib/operatorFormat.ts`: display formatting helpers.
 - `src/lib/operatorMetrics.ts`: profile fallback and sparkline helpers.
 - `src/lib/operatorMetrics.test.ts`: focused tests for the metric helpers.
+- `src/lib/regionTypes.ts`: regional JSON and map-path contracts.
 
 The UI should prefer fields from `operators.json`. Fallback logic in
 `operatorMetrics.ts` exists so older or partial operator records can still
 render, but new production metrics should be generated in
-`scripts/build_operator_index.py`.
+`scripts/build_operator_index.py`. New regional metrics should be generated in
+`scripts/build_region_index.py`.
 
 ## State Model
 
@@ -70,6 +79,14 @@ render, but new production metrics should be generated in
 `useTheme` tracks light/dark display state outside the Operators state machine.
 It applies `.dark` to `document.documentElement` and stores explicit user
 choices in `localStorage`.
+
+`RegionsRoute` tracks:
+
+- `metric`: the active ranking/map shading metric.
+- `hoverSlug`: state highlighted by map or ranking hover/focus.
+- `selectedSlug`: selected state from `?state=<slug>`, synchronized with
+  browser history.
+- loaded national, state, and SVG path JSON.
 
 ## Performance Notes
 

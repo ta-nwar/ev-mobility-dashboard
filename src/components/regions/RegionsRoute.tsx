@@ -59,6 +59,31 @@ const stateLabelAdjust: Record<string, [number, number]> = {
   niedersachsen: [0, 80],
 }
 
+function selectedStateFromUrl() {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  return new URLSearchParams(window.location.search).get("state")
+}
+
+function writeRegionsUrl(stateSlug: string | null, mode: "push" | "replace") {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  const nextUrl = new URL(window.location.href)
+  if (stateSlug) {
+    nextUrl.searchParams.set("state", stateSlug)
+  } else {
+    nextUrl.searchParams.delete("state")
+  }
+  nextUrl.hash = "regions"
+
+  const method = mode === "push" ? "pushState" : "replaceState"
+  window.history[method](null, "", nextUrl)
+}
+
 export function RegionsRoute() {
   const [national, setNational] = useState<RegionRecord | null>(null)
   const [states, setStates] = useState<RegionRecord[]>([])
@@ -66,13 +91,7 @@ export function RegionsRoute() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [metric, setMetric] = useState<MetricKey>("capacity")
   const [hoverSlug, setHoverSlug] = useState<string | null>(null)
-  const [selectedSlug, setSelectedSlug] = useState<string | null>(() => {
-    if (typeof window === "undefined") {
-      return null
-    }
-
-    return new URLSearchParams(window.location.search).get("state")
-  })
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(selectedStateFromUrl)
 
   const isLoading = !national || states.length === 0 || !paths
   const overviewProgress = useCountUp(national ? "overview" : null)
@@ -117,18 +136,20 @@ export function RegionsRoute() {
       return
     }
 
-    const nextUrl = new URL(window.location.href)
-    if (selectedSlug) {
-      nextUrl.searchParams.set("state", selectedSlug)
-      nextUrl.hash = "regions"
-    } else {
-      nextUrl.searchParams.delete("state")
-      if (nextUrl.hash === "#regions") {
-        nextUrl.hash = "regions"
-      }
+    const syncFromUrl = () => {
+      setSelectedSlug(selectedStateFromUrl())
     }
-    window.history.replaceState(null, "", nextUrl)
 
+    window.addEventListener("popstate", syncFromUrl)
+    window.addEventListener("hashchange", syncFromUrl)
+
+    return () => {
+      window.removeEventListener("popstate", syncFromUrl)
+      window.removeEventListener("hashchange", syncFromUrl)
+    }
+  }, [])
+
+  useEffect(() => {
     requestAnimationFrame(() => {
       document.querySelector("main section")?.scrollTo({ top: 0, left: 0 })
     })
@@ -141,6 +162,16 @@ export function RegionsRoute() {
 
     return states.find((state) => state.slug === selectedSlug) ?? null
   }, [selectedSlug, states])
+
+  const selectState = (slug: string) => {
+    setSelectedSlug(slug)
+    writeRegionsUrl(slug, "push")
+  }
+
+  const showOverview = () => {
+    setSelectedSlug(null)
+    writeRegionsUrl(null, "push")
+  }
 
   if (loadError) {
     return (
@@ -172,8 +203,8 @@ export function RegionsRoute() {
           national={national}
           paths={paths}
           progress={detailProgress}
-          onBack={() => setSelectedSlug(null)}
-          onSelectState={setSelectedSlug}
+          onBack={showOverview}
+          onSelectState={selectState}
         />
       </section>
     )
@@ -182,7 +213,11 @@ export function RegionsRoute() {
   return (
     <section className="min-h-0 min-w-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-[1400px] px-6 py-12 sm:px-10">
-        <NationalStrip national={national} progress={overviewProgress} />
+        <NationalStrip
+          national={national}
+          progress={overviewProgress}
+          stateCount={states.length}
+        />
 
         <div className="mt-12">
           <MetricToggle metric={metric} onChange={setMetric} />
@@ -195,14 +230,14 @@ export function RegionsRoute() {
             metric={metric}
             hoverSlug={hoverSlug}
             onHover={setHoverSlug}
-            onSelect={setSelectedSlug}
+            onSelect={selectState}
           />
           <RankedRegions
             states={states}
             metric={metric}
             hoverSlug={hoverSlug}
             onHover={setHoverSlug}
-            onSelect={setSelectedSlug}
+            onSelect={selectState}
           />
         </div>
         <AttributionNote />
@@ -224,9 +259,11 @@ async function fetchJson<T>(path: string): Promise<T> {
 function NationalStrip({
   national,
   progress,
+  stateCount,
 }: {
   national: RegionRecord
   progress: number
+  stateCount: number
 }) {
   return (
     <div>
@@ -235,8 +272,9 @@ function NationalStrip({
         Germany's charging network
       </h1>
       <p className="mt-1 text-[15px] text-muted-foreground">
-        {formatInteger(national.chargingUnits)} charging units across 16 states -
-        400 districts - pick a region to drill in
+        {formatInteger(national.chargingUnits)} charging units across{" "}
+        {formatInteger(stateCount)} states - {formatInteger(national.districtCount)}{" "}
+        districts - pick a region to drill in
       </p>
 
       <div className="mt-8 flex flex-wrap items-start gap-8">
@@ -276,7 +314,7 @@ function MetricToggle({
 }) {
   return (
     <div
-      className="inline-flex rounded-[10px] bg-muted p-1"
+      className="inline-flex max-w-full flex-wrap rounded-[10px] bg-muted p-1"
       role="group"
       aria-label="Regional ranking metric"
     >
@@ -287,7 +325,7 @@ function MetricToggle({
           onClick={() => onChange(option.key)}
           aria-pressed={metric === option.key}
           className={cn(
-            "h-[34px] rounded-[8px] px-4 text-sm transition-colors",
+            "h-[34px] rounded-[8px] px-4 text-sm transition-colors max-sm:px-3",
             metric === option.key
               ? "bg-primary font-semibold text-primary-foreground"
               : "text-muted-foreground hover:text-foreground",
@@ -332,7 +370,7 @@ function GermanyChoropleth({
         <svg
           viewBox={`0 0 ${paths.viewBox.w} ${paths.viewBox.h}`}
           className="block h-auto w-full"
-          role="img"
+          role="group"
           aria-label="Germany states shaded by selected regional metric"
         >
           {paths.states.map((path) => {
@@ -351,7 +389,11 @@ function GermanyChoropleth({
                 className="cursor-pointer outline-none transition-opacity hover:opacity-90 focus-visible:opacity-90"
                 role="button"
                 tabIndex={0}
-                aria-label={state ? `${state.name}, ${metricDisplay(state, metric)}` : path.name}
+                aria-label={
+                  state
+                    ? `Open ${state.name} region detail, ${metricDisplay(state, metric)}`
+                    : `Open ${path.name} region detail`
+                }
                 onMouseEnter={() => onHover(path.slug)}
                 onMouseLeave={() => onHover(null)}
                 onFocus={() => onHover(path.slug)}
@@ -535,7 +577,10 @@ function StateDetail({
           >
             <ChevronLeft className="size-4" />
           </button>
-          <span>Region {state.rank ?? index + 1} of 16</span>
+          <span>
+            Region {state.rank ?? index + 1} of {states.length}
+          </span>
+          <span className="sr-only">Regions are ordered by capacity rank.</span>
           <button
             type="button"
             onClick={() => onSelectState(next.slug)}
@@ -554,8 +599,8 @@ function StateDetail({
             {state.name}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Rank #{state.rank ?? "-"} of 16 / {capacityShare}% of national
-            capacity
+            Rank #{state.rank ?? "-"} of {states.length} / {capacityShare}% of
+            national capacity
           </p>
         </div>
       </div>
@@ -959,7 +1004,7 @@ function RegionRolloutSparkline({ points }: { points: RegionRolloutPoint[] }) {
 }
 
 function useCountUp(trigger: string | null) {
-  const [progress, setProgress] = useState(1)
+  const [progress, setProgress] = useState(0)
 
   useEffect(() => {
     if (!trigger) {

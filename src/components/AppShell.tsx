@@ -28,7 +28,6 @@ function writeActiveItemToUrl(item: NavItem) {
 
   const url = new URL(window.location.href)
   url.searchParams.delete("state")
-  url.searchParams.delete("qa")
   url.hash = item === "Regions" ? "regions" : ""
   window.history.pushState(null, "", url)
 }

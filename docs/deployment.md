@@ -43,10 +43,13 @@ under the GitHub Pages project path.
 
 ## Static Data Paths
 
-The app fetches operator data through `import.meta.env.BASE_URL`:
+The app fetches operator and regional data through `import.meta.env.BASE_URL`:
 
 ```text
 ${import.meta.env.BASE_URL}data/operators.json
+${import.meta.env.BASE_URL}data/regions/index.json
+${import.meta.env.BASE_URL}data/regions/states.json
+${import.meta.env.BASE_URL}data/regions/germany-states-paths.json
 ```
 
 That path works in both environments:
@@ -91,6 +94,14 @@ browser network panel. It should request:
 
 ```text
 /ev-mobility-dashboard/data/operators.json
+```
+
+If Regions never leaves its loading state, also check:
+
+```text
+/ev-mobility-dashboard/data/regions/index.json
+/ev-mobility-dashboard/data/regions/states.json
+/ev-mobility-dashboard/data/regions/germany-states-paths.json
 ```
 
 If assets 404, verify that `GITHUB_PAGES=true` was present during the workflow

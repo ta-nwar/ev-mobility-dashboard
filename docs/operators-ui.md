@@ -125,15 +125,15 @@ Implementation notes:
 
 ## Current Limitations
 
-- Regions and Access tabs are navigation placeholders.
-- Geography still uses a placeholder map panel.
+- Access is still a navigation placeholder.
+- Regions now has its own production dashboard route; keep this document focused
+  on the Operators surface unless an Operators primitive is being changed.
 - Rollout sparklines are non-interactive.
 - Compare view does not yet show rollout small multiples.
 
 ## Good Next Enhancements
 
 - Real Germany dot map from lat/lon samples.
-- Regions tab using the same master-detail pattern by Bundesland.
 - Access tab focused on payment and opening-hour coverage.
 - Hover tooltip for rollout sparkline.
 - Compare rollout row with shared-scale small multiples.

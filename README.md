@@ -13,6 +13,9 @@ Live site:
 - Operator detail view with locations, charging points, capacity, DC-fast share,
   connectors, power profile, geography, access, and rollout metrics.
 - Operator comparison mode for up to four operators.
+- Regions overview with a Germany state choropleth, metric ranking, and state
+  drill-in pages for regional power, market, access, connector, rollout, and
+  district/city breakdowns.
 - Generated operator and regional indexes derived from the cleaned charger
   parquet.
 
@@ -40,11 +43,14 @@ src/
       OperatorOverview.tsx
       OperatorPrimitives.tsx
       OperatorRail.tsx
+    regions/
+      RegionsRoute.tsx
   lib/
     operatorFormat.ts
     operatorMetrics.ts
     operatorMetrics.test.ts
     operatorTypes.ts
+    regionTypes.ts
     useTheme.ts
 scripts/
   build_operator_index.py
@@ -53,6 +59,7 @@ public/data/
   chargers.clean.parquet
   operators.json
   regions/
+    germany-states-paths.json
 docs/
   architecture.md
   data-pipeline.md

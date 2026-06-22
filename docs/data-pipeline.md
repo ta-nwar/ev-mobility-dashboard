@@ -63,20 +63,23 @@ Each operator record includes:
 
 ### Regions
 
-Regional data is split by drill-down route so the app can load only the grain it
-needs:
+Regional data is generated at national, state, district, and city grains:
 
 ```text
 public/data/regions/index.json
 public/data/regions/states.json
+public/data/regions/germany-states-paths.json
 public/data/regions/districts/by-state/{stateSlug}.json
 public/data/regions/cities/by-district/{stateSlug}/{districtSlug}.json
 ```
 
-`index.json` contains source metadata, national totals, counts for each regional
-grain, distinct city-name count, and file templates. `states.json` contains all
-16 state summaries. Each state points to its district file, and each district
-points to its city file.
+`index.json` contains source metadata, national totals, counts for each
+regional grain, distinct city-name count, and file templates. `states.json`
+contains all 16 state summaries and the top district/city summaries used by the
+current Regions UI. `germany-states-paths.json` contains the deployable SVG path
+data for the state map. District and city files are generated for future deeper
+drill-downs; each state points to its district file, and each district points to
+its city file.
 
 Each regional record includes:
 
